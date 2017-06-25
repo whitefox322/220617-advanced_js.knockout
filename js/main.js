@@ -1,160 +1,161 @@
-getCountries();
-getInfo(1);
-
-var newUser = {
-    id: "",
-    fullName: "",
-    birthday: "",
-    profession: "",
-    email: "",
-    address: "",
-    country: "",
-    shortInfo: "",
-    fullInfo: "",
-    photo: "/images/300x300.jpg"
-};
-
-var pagination = [];
-var cashe = null;
-
 var viewModel = {
-    fullObject: ko.observable(null),
-    usersInfo: ko.observableArray(),
-    countries: ko.observableArray(),
-    pages: ko.observableArray(pagination),
-    selectedPag: ko.observable(null),
+    info: ko.observableArray([]),
     selectedUser: ko.observable(null),
-    selectUser: function (user) {
-        viewModel.tryRestore();
-        cashe = JSON.parse(JSON.stringify(user));
-        viewModel.selectedUser(user);
-    },
-    tryRestore: function () {
-        if (cashe && viewModel.selectedUser()) {
-            viewModel.updateUser(viewModel.selectedUser(), cashe);
+    page: ko.observable(1),
+    pagesNumber: ko.pureComputed(function () {
+        var pages = [];
+
+        for (var i = 1; i <= viewModel.totalPages(); i++) {
+            pages.push(i);
         }
+
+        return pages;
+    }),
+    totalPages: ko.observable(0),
+    countries: ko.observableArray([]),
+    forRemove: ko.pureComputed(function () {
+        return viewModel.selectedUser() && viewModel.selectedUser().id();
+    }),
+    getInfo: function () {
+        $.getJSON("/api/users/" + viewModel.page() + "/10/preview")
+            .done(function (object) {
+                viewModel.totalPages(object.totalPages);
+                viewModel.info(object.data);
+            });
     },
-    selectPag: function (pag) {
-        viewModel.selectedPag(pag);
-        console.log(pag);
+    getCountries: function () {
+        $.getJSON("/api/countries/")
+            .done(function (object) {
+                viewModel.countries(object);
+            });
     },
-    addUser: function () {
-        viewModel.selectedUser(newUser);
+    selectUser: function (user) {
+        $.getJSON("/api/users/" + user.id)
+            .done(function (user) {
+                viewModel.selectedUser(new User(user));
+            });
     },
-    cancelAll: function () {
-        viewModel.tryRestore();
-        viewModel.selectedUser(null);
+    goToPage: function (number) {
+        viewModel.page(number);
+        viewModel.getInfo();
     },
-    removeUser: function () {
-        deleteUser(viewModel.selectedUser().id);
-        viewModel.usersInfo.remove(viewModel.selectedUser());
-        viewModel.selectedUser(null);
+    goToPrevPage: function () {
+        if (viewModel.page() <= 1) {
+            return;
+        }
+
+        viewModel.goToPage(viewModel.page() - 1);
+    },
+    goToNextPage: function () {
+        if (viewModel.page() >= viewModel.totalPages()) {
+            return;
+        }
+
+        viewModel.goToPage(viewModel.page() + 1);
     },
     saveUser: function () {
-        if (!viewModel.selectedUser().id) {
-            viewModel.selectedUser().photo = "";
-            createUser();
-        } else {
-            editUser();
+        var type = viewModel.selectedUser().id() ? "put" : "post";
+
+        $.ajax({
+            url: "/api/users",
+            type: type,
+            data: ko.toJSON(viewModel.selectedUser()),
+            contentType: "application/json"
+        }).done(function (data) {
+            viewModel.getInfo();
+            viewModel.selectUser(data);
+        });
+    },
+    removeUser: function () {
+        $.ajax({
+            url: "/api/users/" + viewModel.selectedUser().id(),
+            type: "delete"
+        }).done(function () {
+            viewModel.getInfo();
+            viewModel.selectedUser(null);
+        });
+    },
+    addUser: function () {
+        viewModel.selectedUser(new User({}));
+    },
+    cancel: function () {
+        viewModel.selectedUser(null);
+    },
+    openFileDialog: function () {
+        document.getElementById("openFileDialogElement").click();
+    },
+    uploadImage: function (context, e) {
+        var files = e.target.files;
+
+        if (!files.length) {
+            return;
         }
 
-        var old = viewModel.selectedUser();
-        cashe = null;
-        viewModel.updateUser(old, old);
-    },
-    updateUser: function (oldUser, newU) {
-        var index = viewModel.usersInfo.indexOf(oldUser);
-        var update = {
-            id: newU.id,
-            fullName: newU.fullName,
-            birthday: newU.birthday,
-            profession: newU.profession,
-            email: newU.email,
-            address: newU.address,
-            country: newU.country,
-            shortInfo: newU.shortInfo,
-            fullInfo: newU.fullInfo,
-            photo: newU.photo
-        };
+        var ourImage = files[0];
 
-        viewModel.usersInfo.splice(index, 1, update);
-        viewModel.selectedUser(update);
+        var fileReader = new FileReader();
+        fileReader.readAsDataURL(ourImage);
+        fileReader.onloadend = function () {
+            var dataURI = fileReader.result;
+            viewModel.selectedUser().photo(dataURI);
+        };
     }
 };
 
 ko.applyBindings(viewModel);
 
-function getCountries() {
-    $.getJSON("/api/countries", function (data) {
-        viewModel.countries(data);
-    });
+viewModel.getInfo();
+viewModel.getCountries();
+
+function User(json) {
+    this.id = ko.observable(json.id);
+    this.fullName = ko.observable(json.fullName);
+    this.birthday = ko.observable(json.birthday);
+    this.profession = ko.observable(json.profession);
+    this.email = ko.observable(json.email);
+    this.address = ko.observable(json.address);
+    this.country = ko.observable(json.country);
+    this.shortInfo = ko.observable(json.shortInfo);
+    this.fullInfo = ko.observable(json.fullInfo);
+    this.photo = ko.observable(json.photo);
 }
 
-function getInfo(page) {
-    $.getJSON("/api/users/" + page + "/10/", function (object) {
-        viewModel.usersInfo(object.data);
-        viewModel.fullObject(object);
+ko.bindingHandlers.dateTimePicker = {
+    init: function (element, valueAccessor, allBindingsAccessor) {
+        //initialize datepicker with some optional options
+        var options = allBindingsAccessor().dateTimePickerOptions || {};
+        $(element).datetimepicker(options);
 
-        for (var i = 1; i <= viewModel.fullObject().totalPages; i++) {
-            var element = {
-                index: i
-            };
-            pagination.push(element);
+        //when a user changes the date, update the view model
+        ko.utils.registerEventHandler(element, "dp.change", function (event) {
+            var value = valueAccessor();
+            if (ko.isObservable(value)) {
+                if (event.date != null && !(event.date instanceof Date)) {
+                    value(event.date.toDate());
+                } else {
+                    value(event.date);
+                }
+            }
+        });
+
+        ko.utils.domNodeDisposal.addDisposeCallback(element, function () {
+            var picker = $(element).data("DateTimePicker");
+            if (picker) {
+                picker.destroy();
+            }
+        });
+    },
+    update: function (element, valueAccessor, allBindings, viewModel, bindingContext) {
+
+        var picker = $(element).data("DateTimePicker");
+        //when the view model is updated, update the widget
+        if (picker) {
+            var koDate = ko.utils.unwrapObservable(valueAccessor());
+
+            //in case return from server datetime i am get in this form for example /Date(93989393)/ then fomat this
+            koDate = (typeof (koDate) !== 'object') ? new Date(parseFloat(koDate.replace(/[^0-9]/g, ''))) : koDate;
+
+            picker.date(koDate);
         }
-    });
-}
-
-function createUser() {
-    var $options = {
-        url: "/api/users",
-        type: "post",
-        contentType: "application/json",
-        dataType: "json",
-        data: JSON.stringify(viewModel.selectedUser())
-    };
-
-    $.ajax($options).done(function () {
-        getInfo(0);
-        getInfo(1);
-    });
-}
-
-function deleteUser(id) {
-    $.ajax({
-        url: "/api/users/" + id,
-        type: "delete"
-    });
-}
-
-function editUser() {
-    var $options = {
-        url: "/api/users",
-        type: "put",
-        contentType: "application/json",
-        dataType: "json",
-        data: JSON.stringify(viewModel.selectedUser())
-    };
-
-    $.ajax($options).done(function () {
-        getInfo(0);
-        getInfo(1);
-    });
-}
-
-function clearForm() {
-    var old = {
-        id: "",
-        fullName: "",
-        birthday: "",
-        profession: "",
-        email: "",
-        address: "",
-        country: "",
-        shortInfo: "",
-        fullInfo: "",
-        photo: "/images/300x300.jpg"
-    };
-    viewModel.selectedUser(old);
-    viewModel.selectedUser(null);
-}
-
+    }
+};

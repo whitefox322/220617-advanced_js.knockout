@@ -5,6 +5,7 @@
     <title>Admin Form</title>
     <link rel="stylesheet" href="/styles/app.css">
     <link rel="stylesheet" href="/node_modules/bootstrap/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/node_modules/eonasdan-bootstrap-datetimepicker/build/css/bootstrap-datetimepicker.min.css">
     <link rel="stylesheet" href="/node_modules/toastr/build/toastr.min.css">
     <link href="https://fonts.googleapis.com/css?family=Dosis:300,400,700" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css?family=Neucha:300,400,700" rel="stylesheet">
@@ -63,7 +64,7 @@
         <aside class="col-xs-4 side">
             <form class="side__form">
                 <div class="panel panel-default">
-                    <div class="panel-heading">
+                    <div class="panel-heading clearfix">
                         <p class="side__text">
                             Автори
                             <a href="#" data-bind="click: addUser">
@@ -71,7 +72,8 @@
                             </a>
                         </p>
                         <div class="btn-group btn-group-sm pull-right">
-                            <button type="button" class="btn btn-danger side__text" id="remove" data-bind="enable: selectedUser, click: removeUser">
+                            <button type="button" class="btn btn-danger side__text" id="remove"
+                                    data-bind="click: removeUser, enable: forRemove">
                                 <span class="glyphicon glyphicon-trash"></span>
                                 Видалити
                             </button>
@@ -81,25 +83,38 @@
                             </button>
                         </div>
                     </div>
-                    <div class="list-group side__list" data-bind="foreach: { data: usersInfo, as: 'user' }">
-                        <button type="button" class="list-group-item" data-bind="click: $parent.selectUser">
-                            <span class="badge" data-bind="text: user.country"></span>
+                    <div class="list-group side__list" data-bind="foreach: info">
+                        <button type="button" class="list-group-item"
+                                data-bind="click: $parent.selectUser, css: { active: $parent.selectedUser() && $parent.selectedUser().id() === $data.id }">
+                            <span class="badge" data-bind="text: country"></span>
                             <div class="row">
                                 <div class="col-xs-4">
                                     <a href="#" class="thumbnail side__img">
-                                        <img alt="Avatar" data-bind="attr: { src: user.photo }">
+                                        <img data-bind="attr: { src: photo, alt: fullName }">
                                     </a>
                                 </div>
-                                <div class="col-xs-8 side__text--bold" data-bind="text: user.fullName">
+                                <div class="col-xs-8 side__text--bold" data-bind="text: fullName">
                                 </div>
                             </div>
                         </button>
                     </div>
                     <div class="panel-footer side__footer">
                         <nav aria-label="Page navigation">
-                            <ul class="pagination side__pag" data-bind="foreach: { data: pages, as: 'pag' }">
-                                <li class="active">
-                                    <a href="#" data-bind="click: $root.selectPag, text: pag.index"></a>
+                            <ul class="pagination side__pag">
+                                <li data-bind="css: { disabled: page() === 1 }">
+                                    <a href="#" data-bind="click: goToPrevPage">
+                                        <span class="glyphicon glyphicon-chevron-left"></span>
+                                    </a>
+                                </li>
+                                <!-- ko foreach: pagesNumber -->
+                                <li data-bind="css: { active: $parent.page() === $data }">
+                                    <a href="#" data-bind="text: $data, click: $parent.goToPage"></a>
+                                </li>
+                                <!-- /ko -->
+                                <li data-bind="css: { disabled: page() === totalPages() }">
+                                    <a href="#" data-bind="click: goToNextPage">
+                                        <span class="glyphicon glyphicon-chevron-right"></span>
+                                    </a>
                                 </li>
                             </ul>
                         </nav>
@@ -108,8 +123,8 @@
             </form>
         </aside>
         <main class="col-xs-8">
-            <span class="header" data-bind="visible: !selectedUser()">Виберіть користувача</span>
-            <form class="main__form" data-bind="visible: selectedUser, with: selectedUser, submit: $root.saveUser">
+            <span class="header">Виберіть користувача</span>
+            <form class="main__form" data-bind="with: selectedUser, submit: saveUser">
                 <div class="row form-group">
                     <div class="col-xs-6">
                         <div class="row form-group">
@@ -117,62 +132,72 @@
                                 <label for="photo">Фото</label>
                             </div>
                             <div class="col-xs-10">
-                                <a href="#" id="photo">
-                                    <img alt="Avatar" class="thumbnail main__img" data-bind="attr: { src: photo }">
+                                <a href="#" id="photo" data-bind="click: $parent.openFileDialog">
+                                    <img class="thumbnail main__img" data-bind="attr: { src: photo, alt: fullName }">
                                 </a>
+                                <input type="file" data-bind="event: { change: $parent.uploadImage }"
+                                       id="openFileDialogElement">
                             </div>
                         </div>
                     </div>
                     <div class="col-xs-6">
                         <div class="row form-group">
-                            <input type="hidden" name="id" id="id" data-bind="value: id">
                             <div class="col-xs-4">
                                 <label for="fullname">First name:</label>
                             </div>
                             <div class="col-xs-8 main__tab">
-                                <input type="text" name="fullname" id="fullname" class="form-control" data-bind="value: fullName">
+                                <input type="text" name="fullname" id="fullname" class="form-control"
+                                       data-bind="value: fullName">
                             </div>
                             <div class="col-xs-4">
                                 <label for="birthday">Birthday:</label>
                             </div>
                             <div class="col-xs-8 main__tab">
-                                <input type="text" name="birthday" id="birthday" class="form-control" data-bind="value: birthday">
+                                <input type="text" name="birthday" id="birthday" class="form-control"
+                                       data-bind="value: birthday">
+                                <input type='text' class="form-control" id='datetimepicker4' />
                             </div>
                             <div class="col-xs-4">
                                 <label for="profession">Profession:</label>
                             </div>
                             <div class="col-xs-8 main__tab">
-                                <input type="text" name="profession" id="profession" class="form-control" data-bind="value: profession">
+                                <input type="text" name="profession" id="profession" class="form-control"
+                                       data-bind="value: profession">
                             </div>
                             <div class="col-xs-4">
                                 <label for="email">Email:</label>
                             </div>
                             <div class="col-xs-8 main__tab">
-                                <input type="email" name="email" id="email" class="form-control" data-bind="value: email">
+                                <input type="email" name="email" id="email" class="form-control"
+                                       data-bind="value: email">
                             </div>
                             <div class="col-xs-4">
                                 <label for="address">Address:</label>
                             </div>
                             <div class="col-xs-8 main__tab">
-                                <input type="text" name="address" id="address" class="form-control" data-bind="value: address">
+                                <input type="text" name="address" id="address" class="form-control"
+                                       data-bind="value: address">
                             </div>
                             <div class="col-xs-4">
                                 <label for="country">Country:</label>
                             </div>
                             <div class="col-xs-8 main__tab">
-                                <select name="country" id="country" class="form-control" data-bind="options: $root.countries, optionsCaption: country"></select>
+                                <select name="country" id="country" class="form-control"
+                                        data-bind="options: $parent.countries, value: country"></select>
                             </div>
                             <div class="col-xs-4">
                                 <label for="short-info">ShortInfo:</label>
                             </div>
                             <div class="col-xs-8 main__tab">
-                                <textarea name="short-info" id="short-info" class="form-control" data-bind="text: shortInfo"></textarea>
+                                <textarea name="short-info" id="short-info" class="form-control"
+                                          data-bind="value: shortInfo"></textarea>
                             </div>
                             <div class="col-xs-4">
                                 <label for="full-info">DetailedInfo:</label>
                             </div>
                             <div class="col-xs-8 main__tab">
-                                <textarea name="full-info" id="full-info" class="form-control" data-bind="text: fullInfo"></textarea>
+                                <textarea name="full-info" id="full-info" class="form-control"
+                                          data-bind="value: fullInfo"></textarea>
                             </div>
                         </div>
                     </div>
@@ -183,7 +208,9 @@
                             <button class="btn btn-primary"><span class="glyphicon glyphicon-floppy-save"></span>
                                 Зберегти
                             </button>
-                            <button type="button" class="btn btn-default" id="cancel" data-bind="click: $root.cancelAll">Скасувати</button>
+                            <button type="button" class="btn btn-default" id="cancel" data-bind="click: $parent.cancel">
+                                Скасувати
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -194,10 +221,19 @@
 
 
 <script src="/node_modules/jquery/dist/jquery.min.js"></script>
-
+<script src="/node_modules/moment/min/moment.min.js"></script>
 <script src="/node_modules/bootstrap/dist/js/bootstrap.min.js"></script>
+<script src="/node_modules/eonasdan-bootstrap-datetimepicker/build/js/bootstrap-datetimepicker.min.js"></script>
+<script src="/node_modules/bootstrap-datetimepicker/src/js/bootstrap-datetimepicker.js"></script>
+<script src="/node_modules/bootstrap/js/collapse.js"></script>
+<script src="/node_modules/bootstrap/js/transition.js"></script>
 <script src="/node_modules/knockout/build/output/knockout-latest.debug.js"></script>
 <script src="/node_modules/toastr/build/toastr.min.js"></script>
 <script src="/js/main.js"></script>
+<script type="text/javascript">
+    $(function () {
+        $('#datetimepicker4').datetimepicker();
+    });
+</script>
 </body>
 </html>
